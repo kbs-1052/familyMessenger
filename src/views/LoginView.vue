@@ -1,0 +1,306 @@
+<script setup>
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { supabase } from '../supabase'
+
+const router = useRouter()
+const familyCode = ref('')
+const password = ref('')
+const showPassword = ref(false)
+const name = ref('')
+const familyName = ref('') // 가족 이름 (가입용)
+const isRegistering = ref(false) // 가입 모드 여부
+
+const toggleMode = () => {
+  isRegistering.value = !isRegistering.value
+  familyCode.value = ''
+  password.value = ''
+  name.value = ''
+  familyName.value = ''
+}
+
+const togglePassword = () => {
+  showPassword.value = !showPassword.value
+}
+
+const handleRegister = async () => {
+  if (!familyCode.value || !password.value || !familyName.value) {
+    alert('모든 항목을 입력해주세요.')
+    return
+  }
+
+  // 중복 코드 확인 및 가입 처리
+  const { data: existing } = await supabase
+    .from('family_auth')
+    .select('access_code')
+    .eq('access_code', familyCode.value)
+    .single()
+
+  if (existing) {
+    alert('이미 사용 중인 접속코드입니다. 다른 코드를 입력해주세요.')
+    return
+  }
+
+  const { error } = await supabase
+    .from('family_auth')
+    .insert([{ 
+      access_code: familyCode.value, 
+      password: password.value, 
+      family_name: familyName.value 
+    }])
+
+  if (error) {
+    alert('가족 등록에 실패했습니다.')
+    console.error(error)
+  } else {
+    alert('가족 계정이 생성되었습니다! 이제 로그인해 주세요.')
+    isRegistering.value = false
+  }
+}
+
+const handleLogin = async () => {
+  if (!familyCode.value || !password.value || !name.value) {
+    alert('모든 항목을 입력해주세요.')
+    return
+  }
+
+  // 데이터베이스에서 접속코드와 비밀번호 확인
+  const { data, error } = await supabase
+    .from('family_auth')
+    .select('*')
+    .eq('access_code', familyCode.value)
+    .eq('password', password.value)
+    .single()
+
+  if (error || !data) {
+    alert('접속코드 또는 비밀번호가 일치하지 않습니다.')
+    console.error('로그인 에러:', error)
+  } else {
+    // 로그인 성공 시 로컬 스토리지에 정보 저장
+    localStorage.setItem('family_code', data.access_code)
+    localStorage.setItem('family_name', data.family_name)
+    localStorage.setItem('chat_username', name.value)
+    router.push('/chats')
+  }
+}
+</script>
+
+<template>
+  <div class="login-container flex-col flex-center animate-fade-in">
+    <div class="login-card flex-col animate-slide-up">
+      <div class="logo-area flex-col flex-center">
+        <div class="logo-icon">{{ isRegistering ? '🏡' : '💌' }}</div>
+        <h1>{{ isRegistering ? '새 가족 등록' : '우리 가족 톡' }}</h1>
+        <p class="text-secondary">{{ isRegistering ? '우리 가족만의 공간을 만들어보세요' : '프라이빗 가족 메신저' }}</p>
+      </div>
+
+      <form v-if="!isRegistering" @submit.prevent="handleLogin" class="login-form flex-col">
+        <div class="input-group">
+          <label for="code">접속코드 (Access Code)</label>
+          <input 
+            type="text" 
+            id="code" 
+            v-model="familyCode" 
+            placeholder="우리 가족 고유 코드"
+          />
+        </div>
+
+        <div class="input-group">
+          <label for="pwd">비밀번호</label>
+          <div class="pwd-input-wrapper">
+            <input 
+              :type="showPassword ? 'text' : 'password'" 
+              id="pwd" 
+              v-model="password" 
+              placeholder="비밀번호"
+            />
+            <button type="button" class="eye-btn" @click="togglePassword" title="비밀번호 보기/숨기기">
+              {{ showPassword ? '👁️' : '🙈' }}
+            </button>
+          </div>
+        </div>
+        
+        <div class="input-group">
+          <label for="name">이름 (호칭)</label>
+          <input 
+            type="text" 
+            id="name" 
+            v-model="name" 
+            placeholder="예: 엄마, 아빠, 첫째"
+          />
+        </div>
+
+        <button type="submit" class="btn-primary font-bold">입장하기</button>
+        <button type="button" @click="toggleMode" class="btn-secondary">처음이신가요? 새 가족 등록하기</button>
+      </form>
+
+      <form v-else @submit.prevent="handleRegister" class="login-form flex-col">
+        <div class="input-group">
+          <label for="reg-family-name">가족 이름</label>
+          <input 
+            type="text" 
+            id="reg-family-name" 
+            v-model="familyName" 
+            placeholder="예: 김씨네 가족, 행복한 우리집"
+          />
+        </div>
+
+        <div class="input-group">
+          <label for="reg-code">새 접속코드 (Access Code)</label>
+          <input 
+            type="text" 
+            id="reg-code" 
+            v-model="familyCode" 
+            placeholder="가족이 함께 쓸 고유 코드"
+          />
+        </div>
+
+        <div class="input-group">
+          <label for="reg-pwd">새 비밀번호</label>
+          <input 
+            type="password" 
+            id="reg-pwd" 
+            v-model="password" 
+            placeholder="비밀번호 설정"
+          />
+        </div>
+
+        <button type="submit" class="btn-primary font-bold">가족 등록 완료</button>
+        <button type="button" @click="toggleMode" class="btn-secondary">이미 계정이 있나요? 로그인하기</button>
+      </form>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.login-container {
+  height: 100vh;
+  background: linear-gradient(135deg, var(--color-primary-light) 0%, var(--color-background) 100%);
+  padding: 20px;
+}
+
+.login-card {
+  background: var(--color-surface);
+  width: 100%;
+  max-width: 400px;
+  border-radius: var(--radius-lg);
+  padding: 40px 30px;
+  box-shadow: var(--shadow-lg);
+}
+
+.logo-area {
+  margin-bottom: 40px;
+}
+
+.logo-icon {
+  font-size: 3rem;
+  margin-bottom: 10px;
+}
+
+.logo-area h1 {
+  font-size: 1.5rem;
+  color: var(--color-text);
+  margin-bottom: 5px;
+}
+
+.logo-area p {
+  font-size: 0.9rem;
+}
+
+.login-form {
+  gap: 20px;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.input-group label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.input-group input {
+  padding: 14px 16px;
+  border: 1px solid #E0E0E0;
+  border-radius: var(--radius-sm);
+  font-size: 1rem;
+  font-family: inherit;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.input-group input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(107, 78, 255, 0.1);
+}
+
+.pwd-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.pwd-input-wrapper input {
+  width: 100%;
+  padding-right: 40px; /* 눈모양 버튼 공간 확보 */
+}
+
+.eye-btn {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  cursor: pointer;
+  opacity: 0.6;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s;
+}
+
+.eye-btn:hover {
+  opacity: 1;
+}
+
+.btn-primary {
+  margin-top: 10px;
+  padding: 16px;
+  background-color: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+.btn-primary:active {
+  transform: scale(0.98);
+}
+
+.btn-primary:hover {
+  background-color: var(--color-primary-dark);
+}
+
+.btn-secondary {
+  background: none;
+  border: none;
+  color: var(--color-primary);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 10px;
+  text-decoration: underline;
+  transition: opacity 0.2s;
+}
+
+.btn-secondary:hover {
+  opacity: 0.8;
+}
+</style>
