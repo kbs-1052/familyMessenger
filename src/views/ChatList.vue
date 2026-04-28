@@ -10,7 +10,7 @@ let roomsChannel = null
 let messagesChannel = null
 
 const familyCode = localStorage.getItem('family_code') || 'kimfamily'
-const familyName = localStorage.getItem('family_name') || '우리가족 톡'
+const familyName = localStorage.getItem('family_name') || '우리끼리 톡'
 
 const fetchRooms = async () => {
   const { data: rooms, error } = await supabase

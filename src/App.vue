@@ -49,7 +49,7 @@ const setupGlobalListener = (familyCode) => {
       playSound()
       toast.value = {
         show: true,
-        title: `${msg.user || msg.sender || '가족'}님의 새 메시지`,
+        title: `${msg.user || msg.sender || '모임원'}님의 새 메시지`,
         message: msg.image_url ? '사진을 보냈습니다 📷' : msg.text,
         roomId: msg.room_id
       }

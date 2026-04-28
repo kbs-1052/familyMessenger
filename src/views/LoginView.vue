@@ -8,7 +8,7 @@ const familyCode = ref('')
 const password = ref('')
 const showPassword = ref(false)
 const name = ref('')
-const familyName = ref('') // 가족 이름 (가입용)
+const familyName = ref('') // 그룹 이름 (가입용)
 const isRegistering = ref(false) // 가입 모드 여부
 
 const toggleMode = () => {
@@ -50,15 +50,15 @@ const handleRegister = async () => {
     }])
 
   if (error) {
-    alert('가족 등록에 실패했습니다.')
+    alert('모임 등록에 실패했습니다.')
     console.error(error)
   } else {
-    // 가족 멤버 등록
+    // 모임 멤버 등록
     await supabase.from('family_members').insert([
-      { family_code: familyCode.value, username: name.value || '가장' }
+      { family_code: familyCode.value, username: name.value || '방장' }
     ]).select()
     
-    alert('가족 계정이 생성되었습니다! 이제 로그인해 주세요.')
+    alert('모임 계정이 생성되었습니다! 이제 로그인해 주세요.')
     isRegistering.value = false
   }
 }
@@ -81,7 +81,7 @@ const handleLogin = async () => {
     alert('접속코드 또는 비밀번호가 일치하지 않습니다.')
     console.error('로그인 에러:', error)
   } else {
-    // 성공 시 가족 멤버 테이블에 내 이름 등록 (중복 시 무시)
+    // 성공 시 모임 멤버 테이블에 내 이름 등록 (중복 시 무시)
     await supabase.from('family_members').upsert([
       { family_code: data.access_code, username: name.value }
     ], { onConflict: 'family_code, username' })
@@ -99,9 +99,9 @@ const handleLogin = async () => {
   <div class="login-container flex-col flex-center animate-fade-in">
     <div class="login-card flex-col animate-slide-up">
       <div class="logo-area flex-col flex-center">
-        <img src="/icon.png" alt="가족톡 로고" class="custom-app-logo" />
-        <h1 class="glow-text">{{ isRegistering ? '새 가족 등록' : '우리 가족 톡' }}</h1>
-        <p class="text-secondary">{{ isRegistering ? '우리 가족만의 공간을 만들어보세요' : '프라이빗 가족 메신저' }}</p>
+        <img src="/icon.png" alt="끼리톡 로고" class="custom-app-logo" />
+        <h1 class="glow-text">{{ isRegistering ? '새 모임 등록' : '우리 끼리 톡' }}</h1>
+        <p class="text-secondary">{{ isRegistering ? '우리끼리만의 공간을 만들어보세요' : '프라이빗 그룹 메신저' }}</p>
       </div>
 
       <form v-if="!isRegistering" @submit.prevent="handleLogin" class="login-form flex-col">
@@ -111,7 +111,7 @@ const handleLogin = async () => {
             type="text" 
             id="code" 
             v-model="familyCode" 
-            placeholder="우리 가족 고유 코드"
+            placeholder="우리끼리 고유 코드"
           />
         </div>
 
@@ -136,22 +136,22 @@ const handleLogin = async () => {
             type="text" 
             id="name" 
             v-model="name" 
-            placeholder="예: 엄마, 아빠, 첫째"
+            placeholder="예: 철수, 영희"
           />
         </div>
 
         <button type="submit" class="btn-primary font-bold">입장하기</button>
-        <button type="button" @click="toggleMode" class="btn-secondary">처음이신가요? 새 가족 등록하기</button>
+        <button type="button" @click="toggleMode" class="btn-secondary">처음이신가요? 새 모임 등록하기</button>
       </form>
 
       <form v-else @submit.prevent="handleRegister" class="login-form flex-col">
         <div class="input-group">
-          <label for="reg-family-name">가족 이름</label>
+          <label for="reg-family-name">모임 이름</label>
           <input 
             type="text" 
             id="reg-family-name" 
             v-model="familyName" 
-            placeholder="예: 김씨네 가족, 행복한 우리집"
+            placeholder="예: 독서모임, 동창회"
           />
         </div>
 
@@ -161,7 +161,7 @@ const handleLogin = async () => {
             type="text" 
             id="reg-code" 
             v-model="familyCode" 
-            placeholder="가족이 함께 쓸 고유 코드"
+            placeholder="우리끼리 쓸 고유 코드"
           />
         </div>
 
@@ -175,7 +175,7 @@ const handleLogin = async () => {
           />
         </div>
 
-        <button type="submit" class="btn-primary font-bold">가족 등록 완료</button>
+        <button type="submit" class="btn-primary font-bold">모임 등록 완료</button>
         <button type="button" @click="toggleMode" class="btn-secondary">이미 계정이 있나요? 로그인하기</button>
       </form>
     </div>

@@ -1,7 +1,7 @@
 {
-  "name": "우리가족톡",
-  "short_name": "가족톡",
-  "description": "우리 가족만의 프라이빗 메신저",
+  "name": "우리끼리톡",
+  "short_name": "끼리톡",
+  "description": "우리끼리만의 프라이빗 메신저",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

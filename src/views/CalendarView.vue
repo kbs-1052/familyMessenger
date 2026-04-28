@@ -25,7 +25,7 @@ const fetchEvents = async () => {
 }
 
 const addEvent = async () => {
-  const title = prompt('새로운 일정 이름을 입력하세요:\n(예: 부모님 생신, 가족 여행)')
+  const title = prompt('새로운 일정 이름을 입력하세요:\n(예: 친구 생일, 우리 모임)')
   if (!title || !title.trim()) return
   
   const dateStr = prompt('날짜를 입력하세요 (YYYY-MM-DD 형식):\n(예: 2026-05-15)', new Date().toISOString().split('T')[0])
@@ -109,14 +109,14 @@ onUnmounted(() => {
 <template>
   <div class="calendar-view flex-col animate-fade-in">
     <header class="app-header">
-      <h1 class="header-title font-bold">가족 캘린더 🗓️</h1>
+      <h1 class="header-title font-bold">끼리 캘린더 🗓️</h1>
       <button class="icon-btn" @click="addEvent" title="새 일정 추가">➕</button>
     </header>
 
     <div class="calendar-container">
       <div v-if="events.length === 0" class="empty-state">
-        <div class="empty-icon">🏖️</div>
-        <p>등록된 가족 일정이 없습니다.</p>
+        <div class="empty-icon">📅</div>
+        <p>등록된 모임 일정이 없습니다.</p>
         <p class="text-secondary text-sm">우측 상단 ➕ 버튼을 눌러 일정을 추가해 보세요.</p>
       </div>
       
