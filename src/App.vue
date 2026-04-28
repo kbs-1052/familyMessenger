@@ -45,17 +45,36 @@ const setupGlobalListener = (familyCode) => {
         return
       }
 
+      const title = `${msg.user || msg.sender || '모임원'}님의 새 메시지`
+      const body = msg.image_url ? '사진을 보냈습니다 📷' : msg.text
+
       // 소리 재생 및 토스트 팝업 표시
       playSound()
       toast.value = {
         show: true,
-        title: `${msg.user || msg.sender || '모임원'}님의 새 메시지`,
-        message: msg.image_url ? '사진을 보냈습니다 📷' : msg.text,
+        title: title,
+        message: body,
         roomId: msg.room_id
       }
       
       // 3.5초 후 팝업 자동 닫힘
       setTimeout(() => { toast.value.show = false }, 3500)
+
+      // OS 네이티브 알림 표시 (권한 허용 시) - 앱이 백그라운드에 있을 때도 카톡처럼 상단에 뜸
+      if ('Notification' in window && Notification.permission === 'granted') {
+        // 이미 화면을 보고 있다면 굳이 네이티브 알림을 안 띄움
+        if (document.visibilityState === 'hidden') {
+          const noti = new Notification(title, {
+            body: body,
+            icon: '/family-icon.png' // manifest에 있는 아이콘
+          })
+          noti.onclick = () => {
+            window.focus()
+            goToRoom(msg.room_id)
+            noti.close()
+          }
+        }
+      }
     })
     .subscribe()
 }

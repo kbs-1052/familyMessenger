@@ -99,6 +99,11 @@ const handleLogin = async () => {
     localStorage.setItem('family_name', data.family_name)
     localStorage.setItem('chat_username', name.value)
     
+    // 알림 권한 요청 (카톡처럼 네이티브 알림 표시용)
+    if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+      Notification.requestPermission()
+    }
+
     // 로딩 상태를 유지한 채로 페이지 이동
     router.push('/chats')
   }
