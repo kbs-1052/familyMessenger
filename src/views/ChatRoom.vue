@@ -32,10 +32,97 @@ const messages = ref([])
 const onlineUsers = ref([])
 
 const roomTitle = ref('로딩 중...')
+const totalFamilyMembers = ref(1)
+
+// 투표 관련 상태
+const showPollModal = ref(false)
+const pollQuestion = ref('')
+const pollOptions = ref([{ text: '' }, { text: '' }])
+
+const togglePollModal = () => {
+  showPollModal.value = !showPollModal.value
+  if (showPollModal.value) {
+    pollQuestion.value = ''
+    pollOptions.value = [{ text: '' }, { text: '' }]
+  }
+}
+
+const addPollOption = () => {
+  pollOptions.value.push({ text: '' })
+}
+
+const createPoll = async () => {
+  if (!pollQuestion.value.trim() || pollOptions.value.filter(o => o.text.trim()).length < 2) {
+    alert('질문과 최소 2개의 항목을 입력하세요.')
+    return
+  }
+  
+  const pollData = {
+    question: pollQuestion.value.trim(),
+    options: pollOptions.value.filter(o => o.text.trim()).map((o, i) => ({ id: i, text: o.text.trim(), votes: [] }))
+  }
+  
+  await sendMessage('', null, 'poll', pollData)
+  togglePollModal()
+}
+
+const votePoll = async (msgId, optionId) => {
+  const msg = messages.value.find(m => m.id === msgId)
+  if (!msg || msg.type !== 'poll') return
+  
+  // 상태 복사
+  const newPollData = JSON.parse(JSON.stringify(msg.poll_data))
+  
+  // 기존 투표 제거 (1인 1표)
+  newPollData.options.forEach(opt => {
+    opt.votes = opt.votes.filter(v => v !== currentUser)
+  })
+  
+  // 새 투표 추가
+  const selectedOpt = newPollData.options.find(o => o.id === optionId)
+  if (selectedOpt) {
+    selectedOpt.votes.push(currentUser)
+  }
+  
+  // 화면 즉시 반영 및 DB 업데이트
+  msg.poll_data = newPollData
+  await supabase.from('messages').update({ poll_data: newPollData }).eq('id', msgId)
+}
+
+const getPollPercentage = (pollData, opt) => {
+  const totalVotes = pollData.options.reduce((sum, o) => sum + o.votes.length, 0)
+  if (totalVotes === 0) return 0
+  return Math.round((opt.votes.length / totalVotes) * 100)
+}
+
+const fetchTotalFamilyMembers = async () => {
+  const { count } = await supabase.from('family_members').select('*', { count: 'exact' }).eq('family_code', familyCode)
+  totalFamilyMembers.value = count || 1
+}
 
 const updateLastRead = () => {
   const roomId = route.params.id || 1
   localStorage.setItem(`last_read_${roomId}`, new Date().toISOString())
+}
+
+const markMessagesAsRead = async (msgs) => {
+  // 내가 보낸 것이 아니고, 아직 내가 안 읽은 메시지만 찾음
+  const unreadMsgs = msgs.filter(m => m.user !== currentUser && m.sender !== currentUser && !(m.read_by || '').includes(currentUser))
+  if (unreadMsgs.length === 0) return
+
+  for (const msg of unreadMsgs) {
+    const newReadBy = msg.read_by ? msg.read_by + ',' + currentUser : currentUser;
+    msg.read_by = newReadBy // 화면 즉시 업데이트
+    
+    // DB 업데이트 (await 안하고 백그라운드로 쏨)
+    supabase.from('messages').update({ read_by: newReadBy }).eq('id', msg.id).then()
+  }
+}
+
+const getUnreadCount = (msg) => {
+  const readList = (msg.read_by || '').split(',').filter(Boolean)
+  const count = totalFamilyMembers.value - 1 - readList.length
+  return Math.max(0, count)
 }
 
 const fetchRoomInfo = async () => {
@@ -63,7 +150,6 @@ const getAvatarEmoji = (name) => {
   if (name.includes('형') || name.includes('오빠')) return '👨‍🦱';
   if (name.includes('동생')) return '👶';
   
-  // 그 외의 이름은 무작위 동물 이모티콘 부여 (이름에 따라 고정됨)
   const emojis = ['🐶', '🐱', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮'];
   let sum = 0;
   for (let i = 0; i < name.length; i++) sum += name.charCodeAt(i);
@@ -78,7 +164,6 @@ const scrollToBottom = () => {
   nextTick(() => {
     if (chatContainer.value) {
       chatContainer.value.scrollTop = chatContainer.value.scrollHeight
-      // 모바일 키보드 애니메이션이나 DOM 렌더링 지연을 고려해 0.1초 후 한번 더 스크롤
       setTimeout(() => {
         if (chatContainer.value) {
           chatContainer.value.scrollTop = chatContainer.value.scrollHeight
@@ -95,13 +180,13 @@ const fetchMessages = async () => {
     .select('*')
     .eq('room_id', roomId)
     .eq('family_code', familyCode)
-    .eq('family_code', familyCode)
     .order('created_at', { ascending: true })
     
   if (error) {
     console.error('Error fetching messages:', error)
   } else if (data) {
     messages.value = data
+    markMessagesAsRead(messages.value)
     scrollToBottom()
   }
 }
@@ -121,26 +206,23 @@ const handleFileUpload = async (event) => {
     const fileExt = file.name.split('.').pop()
     const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
     
-    // Storage에 업로드
     const { data, error } = await supabase.storage
       .from('chat-images')
       .upload(fileName, file)
 
     if (error) throw error
 
-    // Public URL 가져오기
     const { data: { publicUrl } } = supabase.storage
       .from('chat-images')
       .getPublicUrl(fileName)
 
-    // 빈 텍스트와 함께 이미지 URL 전송
     await sendMessage('', publicUrl)
   } catch (error) {
     console.error('업로드 실패:', error)
-    alert('이미지 업로드에 실패했습니다. Storage 설정이나 정책을 확인하세요.')
+    alert('이미지 업로드에 실패했습니다.')
   } finally {
     isUploading.value = false
-    event.target.value = '' // input 초기화
+    event.target.value = ''
   }
 }
 
@@ -162,15 +244,13 @@ const downloadImage = async (url) => {
     document.body.removeChild(a)
     window.URL.revokeObjectURL(blobUrl)
   } catch (error) {
-    console.error('다운로드 실패:', error)
-    // 보안 정책(CORS) 등으로 인해 직접 다운로드가 막힌 경우 새 창으로 열기 (대체 수단)
     window.open(url, '_blank')
   }
 }
 
-const sendMessage = async (textOverride = null, imageUrl = null) => {
+const sendMessage = async (textOverride = null, imageUrl = null, type = 'text', pollData = null) => {
   const textToSend = textOverride !== null ? textOverride : messageInput.value
-  if (!textToSend.trim() && !imageUrl) return
+  if (!textToSend.trim() && !imageUrl && type !== 'poll') return
   
   const now = new Date()
   const hours = now.getHours()
@@ -183,22 +263,26 @@ const sendMessage = async (textOverride = null, imageUrl = null) => {
   const newMessage = {
     room_id: roomId,
     sender: currentUser,
+    user: currentUser, // 호환성
     text: textToSend,
     time: formattedTime,
     image_url: imageUrl,
-    family_code: familyCode
+    family_code: familyCode,
+    type: type,
+    poll_data: pollData,
+    read_by: ''
   }
 
   // 1. 화면에 즉시 표시 (Optimistic UI Update)
   const tempId = Date.now()
   messages.value.push({ ...newMessage, id: tempId })
   
-  if (textOverride === null) {
+  if (textOverride === null && type !== 'poll') {
     messageInput.value = ''
   }
   scrollToBottom()
 
-  // 2. 백그라운드에서 DB에 메시지 저장
+  // 2. DB에 저장
   const { data, error } = await supabase
     .from('messages')
     .insert([newMessage])
@@ -206,7 +290,6 @@ const sendMessage = async (textOverride = null, imageUrl = null) => {
 
   if (error) {
     console.error('Error sending message:', error)
-    // 전송 실패 시 방금 추가한 메시지 제거
     messages.value = messages.value.filter(m => m.id !== tempId)
     alert('메시지 전송에 실패했습니다.')
     return
@@ -221,15 +304,14 @@ const sendMessage = async (textOverride = null, imageUrl = null) => {
   }
 }
 
-// 채널 연결 객체를 저장할 변수 (컴포넌트 언마운트 시 정리용)
 let roomChannel = null
 
 onMounted(() => {
   updateLastRead()
   fetchRoomInfo()
+  fetchTotalFamilyMembers()
   fetchMessages()
   
-  // 실시간(Realtime) 메시지 및 접속자(Presence) 구독
   const roomId = route.params.id || 1
   roomChannel = supabase.channel(`room_${roomId}`, {
     config: {
@@ -242,7 +324,6 @@ onMounted(() => {
       const newState = roomChannel.presenceState()
       const users = []
       for (const key in newState) {
-        // 동일 기기에서 여러 번 연결되는 경우를 대비해 첫 번째 데이터만 사용
         users.push(newState[key][0].username)
       }
       onlineUsers.value = [...new Set(users)]
@@ -253,18 +334,31 @@ onMounted(() => {
       table: 'messages',
       filter: `room_id=eq.${roomId}`
     }, (payload) => {
-      console.log('새 메시지 수신됨 (Realtime):', payload)
       const exists = messages.value.find(m => m.id === payload.new.id)
       if (!exists) {
+        // 내가 보고 있는 방에 새 메시지가 왔으면 즉시 읽음 처리
+        if (payload.new.sender !== currentUser && payload.new.user !== currentUser) {
+          payload.new.read_by = payload.new.read_by ? payload.new.read_by + ',' + currentUser : currentUser
+          supabase.from('messages').update({ read_by: payload.new.read_by }).eq('id', payload.new.id).then()
+        }
         messages.value.push(payload.new)
         scrollToBottom()
-        updateLastRead() // 방을 보고 있는 동안에는 계속 읽음 처리
+        updateLastRead()
+      }
+    })
+    .on('postgres_changes', { 
+      event: 'UPDATE', 
+      schema: 'public', 
+      table: 'messages',
+      filter: `room_id=eq.${roomId}`
+    }, (payload) => {
+      const index = messages.value.findIndex(m => m.id === payload.new.id)
+      if (index !== -1) {
+        messages.value[index] = payload.new
       }
     })
     .subscribe(async (status) => {
-      console.log('Realtime 구독 상태:', status)
       if (status === 'SUBSCRIBED') {
-        console.log('✅ 실시간 채팅 및 Presence 연결 완료!')
         await roomChannel.track({
           username: currentUser
         })
@@ -272,7 +366,6 @@ onMounted(() => {
     })
 })
 
-// 컴포넌트가 파괴될 때(뒤로가기 등) 구독 해제 및 마지막으로 한 번 더 시간 기록
 onUnmounted(() => {
   updateLastRead()
   if (roomChannel) {
@@ -299,24 +392,89 @@ onUnmounted(() => {
         v-for="msg in messages" 
         :key="msg.id" 
         class="message-wrapper animate-slide-up"
-        :class="{ 'my-message': msg.sender === currentUser }"
+        :class="{ 'my-message': msg.sender === currentUser || msg.user === currentUser }"
       >
-        <div v-if="msg.sender !== currentUser" class="sender-name">
-          {{ getAvatarEmoji(msg.sender) }} {{ msg.sender }}
+        <div v-if="msg.sender !== currentUser && msg.user !== currentUser" class="sender-name">
+          {{ getAvatarEmoji(msg.sender || msg.user) }} {{ msg.sender || msg.user }}
         </div>
+        
         <div class="message-row">
-          <div class="message-bubble" :class="{ 'has-image': msg.image_url }">
-            <img 
-              v-if="msg.image_url" 
-              :src="msg.image_url" 
-              class="message-image" 
-              alt="첨부 이미지" 
-              @click="downloadImage(msg.image_url)"
-              title="클릭하여 다운로드"
-            />
-            <div v-if="msg.text" class="message-text">{{ msg.text }}</div>
+          <!-- 내가 보낸 메시지: 안 읽은 사람 수 (왼쪽) -->
+          <span v-if="(msg.sender === currentUser || msg.user === currentUser) && getUnreadCount(msg) > 0" class="unread-count">
+            {{ getUnreadCount(msg) }}
+          </span>
+
+          <div class="message-bubble" :class="{ 'has-image': msg.image_url, 'is-poll': msg.type === 'poll' }">
+            
+            <!-- 텍스트 또는 이미지 메시지 -->
+            <template v-if="!msg.type || msg.type === 'text'">
+              <img 
+                v-if="msg.image_url" 
+                :src="msg.image_url" 
+                class="message-image" 
+                alt="첨부 이미지" 
+                @click="downloadImage(msg.image_url)"
+                title="클릭하여 다운로드"
+              />
+              <div v-if="msg.text" class="message-text">{{ msg.text }}</div>
+            </template>
+
+            <!-- 투표 메시지 -->
+            <template v-if="msg.type === 'poll' && msg.poll_data">
+              <div class="poll-container">
+                <h4>📊 {{ msg.poll_data.question }}</h4>
+                <div 
+                  v-for="opt in msg.poll_data.options" 
+                  :key="opt.id" 
+                  class="poll-option" 
+                  @click="votePoll(msg.id, opt.id)"
+                  :class="{'voted': opt.votes.includes(currentUser)}"
+                >
+                  <div class="poll-bar" :style="{ width: getPollPercentage(msg.poll_data, opt) + '%' }"></div>
+                  <div class="poll-opt-content">
+                    <span class="poll-text">{{ opt.text }}</span>
+                    <span class="poll-votes" v-if="opt.votes.length > 0">{{ opt.votes.length }}명</span>
+                  </div>
+                </div>
+              </div>
+            </template>
+
           </div>
-          <span class="message-time text-secondary">{{ msg.time }}</span>
+
+          <!-- 남이 보낸 메시지: 안 읽은 사람 수 (오른쪽) -->
+          <span v-if="msg.sender !== currentUser && msg.user !== currentUser && getUnreadCount(msg) > 0" class="unread-count">
+            {{ getUnreadCount(msg) }}
+          </span>
+          
+          <div class="time-container">
+            <span class="message-time text-secondary">{{ msg.time }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 투표 만들기 모달 -->
+    <div v-if="showPollModal" class="poll-modal-overlay" @click="togglePollModal">
+      <div class="poll-modal" @click.stop>
+        <h3>📊 투표 만들기</h3>
+        <input type="text" v-model="pollQuestion" placeholder="질문을 입력하세요" class="poll-input main-input" />
+        
+        <div class="poll-options-list">
+          <input 
+            v-for="(opt, idx) in pollOptions" 
+            :key="idx" 
+            type="text" 
+            v-model="opt.text" 
+            :placeholder="`항목 ${idx + 1}`" 
+            class="poll-input" 
+          />
+        </div>
+        
+        <button class="add-opt-btn" @click="addPollOption">+ 항목 추가</button>
+        
+        <div class="poll-actions">
+          <button class="btn-secondary" @click="togglePollModal">취소</button>
+          <button class="btn-primary" @click="createPoll">투표 등록</button>
         </div>
       </div>
     </div>
@@ -334,11 +492,13 @@ onUnmounted(() => {
     </div>
 
     <div class="chat-input-area">
-      <button class="icon-btn" @click="toggleEmojiPicker" :disabled="isUploading">😀</button>
+      <button class="icon-btn" @click="toggleEmojiPicker" :disabled="isUploading" title="이모티콘">😀</button>
       <input type="file" ref="fileInput" accept="image/*" style="display: none" @change="handleFileUpload" />
-      <button class="icon-btn" @click="triggerFileInput" :disabled="isUploading">
+      <button class="icon-btn" @click="triggerFileInput" :disabled="isUploading" title="사진 전송">
         {{ isUploading ? '⏳' : '📎' }}
       </button>
+      <button class="icon-btn" @click="togglePollModal" :disabled="isUploading" title="투표 만들기">📊</button>
+      
       <input 
         type="text" 
         v-model="messageInput" 
@@ -365,7 +525,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  height: 100dvh; /* 모바일 브라우저 주소창 고려 */
+  height: 100dvh;
   background-color: var(--color-background);
 }
 
@@ -412,7 +572,7 @@ onUnmounted(() => {
   flex: 1;
   overflow-y: auto;
   padding: 20px 16px;
-  padding-bottom: 40px; /* 키보드가 내려갈 때를 대비한 넉넉한 여백 */
+  padding-bottom: 40px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -444,7 +604,15 @@ onUnmounted(() => {
 }
 
 .my-message .message-row {
-  flex-direction: row-reverse;
+  flex-direction: row; /* my-message 컨테이너 안에서 왼쪽 요소가 자연스럽게 위치하도록 */
+}
+
+/* 읽음 표시 카운트 */
+.unread-count {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #FFC107; /* 카카오톡과 유사한 노란색/주황색 계열 */
+  margin-bottom: 2px;
 }
 
 .message-bubble {
@@ -464,8 +632,21 @@ onUnmounted(() => {
   box-shadow: none;
 }
 
-.my-message .message-bubble.has-image {
-  background-color: transparent;
+.message-bubble.is-poll {
+  padding: 15px;
+  background-color: var(--color-surface);
+  min-width: 220px;
+}
+
+.my-message .message-bubble:not(.has-image):not(.is-poll) {
+  background-color: var(--color-message-sent);
+  color: var(--color-message-sent-text);
+  border-top-right-radius: 4px;
+  border-top-left-radius: var(--radius-md);
+}
+
+.message-wrapper:not(.my-message) .message-bubble:not(.has-image):not(.is-poll) {
+  border-top-left-radius: 4px;
 }
 
 .message-image {
@@ -497,15 +678,142 @@ onUnmounted(() => {
   color: var(--color-message-sent-text);
 }
 
-/* 타인 말풍선 꼬리표 (선택사항) */
-.message-wrapper:not(.my-message) .message-bubble {
-  border-top-left-radius: 4px;
+/* 투표 UI 스타일 */
+.poll-container h4 {
+  margin: 0 0 12px 0;
+  font-size: 1rem;
+  color: var(--color-text);
 }
 
-.my-message .message-bubble {
-  background-color: var(--color-message-sent);
-  color: var(--color-message-sent-text);
-  border-top-right-radius: 4px;
+.poll-option {
+  position: relative;
+  background: rgba(0,0,0,0.04);
+  border-radius: 6px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  overflow: hidden;
+  border: 1px solid transparent;
+  transition: all 0.2s;
+}
+
+.poll-option.voted {
+  border-color: var(--color-primary);
+  background: rgba(107, 78, 255, 0.05);
+}
+
+.poll-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background-color: rgba(107, 78, 255, 0.15);
+  transition: width 0.3s ease;
+}
+
+.poll-option.voted .poll-bar {
+  background-color: rgba(107, 78, 255, 0.3);
+}
+
+.poll-opt-content {
+  position: relative;
+  padding: 10px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 1;
+}
+
+.poll-text {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.poll-votes {
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: var(--color-primary);
+}
+
+/* 모달 스타일 */
+.poll-modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.poll-modal {
+  background: var(--color-surface);
+  width: 90%;
+  max-width: 400px;
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  box-shadow: var(--shadow-lg);
+}
+
+.poll-modal h3 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  font-size: 1.2rem;
+}
+
+.poll-input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  font-family: inherit;
+}
+
+.poll-input.main-input {
+  font-weight: bold;
+  border-color: var(--color-primary);
+  margin-bottom: 15px;
+}
+
+.add-opt-btn {
+  background: none;
+  border: none;
+  color: var(--color-primary);
+  font-weight: 600;
+  padding: 10px 0;
+  cursor: pointer;
+  margin-bottom: 15px;
+}
+
+.poll-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.poll-actions button {
+  padding: 10px 16px;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+  border: none;
+}
+
+.btn-secondary {
+  background: #f0f0f0;
+  color: #333;
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: white;
+}
+
+.time-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
 }
 
 .message-time {

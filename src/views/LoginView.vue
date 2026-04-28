@@ -53,6 +53,11 @@ const handleRegister = async () => {
     alert('가족 등록에 실패했습니다.')
     console.error(error)
   } else {
+    // 가족 멤버 등록
+    await supabase.from('family_members').insert([
+      { family_code: familyCode.value, username: name.value || '가장' }
+    ]).select()
+    
     alert('가족 계정이 생성되었습니다! 이제 로그인해 주세요.')
     isRegistering.value = false
   }
@@ -76,6 +81,11 @@ const handleLogin = async () => {
     alert('접속코드 또는 비밀번호가 일치하지 않습니다.')
     console.error('로그인 에러:', error)
   } else {
+    // 성공 시 가족 멤버 테이블에 내 이름 등록 (중복 시 무시)
+    await supabase.from('family_members').upsert([
+      { family_code: data.access_code, username: name.value }
+    ], { onConflict: 'family_code, username' })
+
     // 로그인 성공 시 로컬 스토리지에 정보 저장
     localStorage.setItem('family_code', data.access_code)
     localStorage.setItem('family_name', data.family_name)

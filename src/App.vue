@@ -6,6 +6,7 @@ import { supabase } from './supabase'
 const router = useRouter()
 const route = useRoute()
 const toast = ref({ show: false, title: '', message: '', roomId: null })
+const d1Alert = ref({ show: false, title: '' }) // D-1 알림 상태
 let globalChannel = null
 let currentFamilyCode = null
 
@@ -59,12 +60,41 @@ const setupGlobalListener = (familyCode) => {
     .subscribe()
 }
 
+// 내일 일정(D-1) 확인
+const checkD1Events = async (familyCode) => {
+  if (!familyCode) return
+  
+  const today = new Date()
+  const tomorrow = new Date(today)
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  
+  // YYYY-MM-DD 형식으로 내일 날짜 생성
+  const tzOffset = tomorrow.getTimezoneOffset() * 60000
+  const localTomorrow = new Date(tomorrow.getTime() - tzOffset)
+  const tomorrowStr = localTomorrow.toISOString().split('T')[0]
+
+  const { data, error } = await supabase
+    .from('calendar_events')
+    .select('*')
+    .eq('family_code', familyCode)
+    .eq('event_date', tomorrowStr)
+
+  if (!error && data && data.length > 0) {
+    // 첫 번째 D-1 이벤트 알림
+    d1Alert.value = {
+      show: true,
+      title: data[0].title
+    }
+  }
+}
+
 // 앱이 처음 켜질 때 알림 리스너 설정
 onMounted(() => {
   const code = localStorage.getItem('family_code')
   if (code) {
     currentFamilyCode = code
     setupGlobalListener(code)
+    checkD1Events(code)
   }
 })
 
@@ -74,6 +104,7 @@ watch(() => route.path, () => {
   if (code !== currentFamilyCode) {
     currentFamilyCode = code
     setupGlobalListener(code)
+    checkD1Events(code)
   }
 })
 
@@ -102,6 +133,18 @@ const goToRoom = (roomId) => {
         <div class="toast-content">
           <h4>{{ toast.title }}</h4>
           <p>{{ toast.message }}</p>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- D-1 이벤트 특별 알림 -->
+    <Transition name="fade">
+      <div v-if="d1Alert.show" class="d1-overlay" @click="d1Alert.show = false">
+        <div class="d1-card" @click.stop>
+          <div class="d1-icon animate-bounce">🎉</div>
+          <h2>내일은 특별한 날!</h2>
+          <p><strong>{{ d1Alert.title }}</strong> 일정이 하루 남았습니다!</p>
+          <button class="btn-primary" @click="d1Alert.show = false">확인</button>
         </div>
       </div>
     </Transition>
@@ -175,5 +218,69 @@ const goToRoom = (roomId) => {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 250px;
+}
+
+/* D-1 알림 디자인 */
+.d1-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  backdrop-filter: blur(5px);
+}
+
+.d1-card {
+  background: var(--color-surface, #ffffff);
+  padding: 40px;
+  border-radius: var(--radius-lg, 16px);
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  max-width: 85%;
+  animation: slide-up 0.3s ease-out;
+}
+
+.d1-icon {
+  font-size: 4rem;
+  margin-bottom: 20px;
+}
+
+.d1-card h2 {
+  color: var(--color-primary, #6b4eff);
+  margin-bottom: 10px;
+  font-size: 1.5rem;
+}
+
+.d1-card p {
+  font-size: 1.1rem;
+  margin-bottom: 30px;
+  line-height: 1.5;
+}
+
+.d1-card .btn-primary {
+  width: 100%;
+  padding: 15px;
+  background-color: var(--color-primary, #6b4eff);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm, 8px);
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+.animate-bounce {
+  animation: bounce 2s infinite;
 }
 </style>
