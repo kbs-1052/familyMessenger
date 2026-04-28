@@ -14,6 +14,8 @@ async function testConnection() {
     sender: '테스트',
     text: '테스트 메시지',
     time: '오후 1:00',
+    image_url: null,
+    family_code: 'kimfamily',
     type: 'text',
     poll_data: null,
     read_by: ''

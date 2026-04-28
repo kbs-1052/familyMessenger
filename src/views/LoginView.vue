@@ -57,10 +57,10 @@ const handleRegister = async () => {
     alert('모임 등록에 실패했습니다.')
     console.error(error)
   } else {
-    // 모임 멤버 등록
-    await supabase.from('family_members').insert([
+    // 모임 멤버 등록 (백그라운드 처리)
+    supabase.from('family_members').insert([
       { family_code: familyCode.value, username: name.value || '방장' }
-    ]).select()
+    ]).then()
     
     alert('모임 계정이 생성되었습니다! 이제 로그인해 주세요.')
     isRegistering.value = false
@@ -89,10 +89,10 @@ const handleLogin = async () => {
     console.error('로그인 에러:', error)
     isSubmitting.value = false
   } else {
-    // 성공 시 모임 멤버 테이블에 내 이름 등록 (중복 시 무시)
-    await supabase.from('family_members').upsert([
+    // 성공 시 모임 멤버 테이블에 내 이름 등록 (중복 시 무시) - 비동기로 백그라운드 처리
+    supabase.from('family_members').upsert([
       { family_code: data.access_code, username: name.value }
-    ], { onConflict: 'family_code, username' })
+    ], { onConflict: 'family_code, username' }).then()
 
     // 로그인 성공 시 로컬 스토리지에 정보 저장
     localStorage.setItem('family_code', data.access_code)
