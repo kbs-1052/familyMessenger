@@ -120,11 +120,7 @@ const goToRoom = (roomId) => {
 
 <template>
   <div class="app-root">
-    <router-view v-slot="{ Component }">
-      <transition name="fade" mode="out-in">
-        <component :is="Component" />
-      </transition>
-    </router-view>
+    <router-view />
 
     <!-- 글로벌 알림 토스트 (옵션 1) -->
     <Transition name="toast">
