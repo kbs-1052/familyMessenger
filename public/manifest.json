@@ -1,0 +1,17 @@
+{
+  "name": "우리가족톡",
+  "short_name": "가족톡",
+  "description": "우리 가족만의 프라이빗 메신저",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#6b4eff",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
