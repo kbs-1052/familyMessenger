@@ -99,8 +99,8 @@ const handleLogin = async () => {
   <div class="login-container flex-col flex-center animate-fade-in">
     <div class="login-card flex-col animate-slide-up">
       <div class="logo-area flex-col flex-center">
-        <div class="logo-icon">{{ isRegistering ? '🏡' : '💌' }}</div>
-        <h1>{{ isRegistering ? '새 가족 등록' : '우리 가족 톡' }}</h1>
+        <img src="/icon.png" alt="가족톡 로고" class="custom-app-logo" />
+        <h1 class="glow-text">{{ isRegistering ? '새 가족 등록' : '우리 가족 톡' }}</h1>
         <p class="text-secondary">{{ isRegistering ? '우리 가족만의 공간을 만들어보세요' : '프라이빗 가족 메신저' }}</p>
       </div>
 
@@ -185,32 +185,59 @@ const handleLogin = async () => {
 <style scoped>
 .login-container {
   height: 100vh;
-  background: linear-gradient(135deg, var(--color-primary-light) 0%, var(--color-background) 100%);
+  /* 동적 애니메이션 그라데이션 배경 */
+  background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab, #6b4eff);
+  background-size: 400% 400%;
+  animation: gradientBG 15s ease infinite;
   padding: 20px;
 }
 
+@keyframes gradientBG {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
 .login-card {
-  background: var(--color-surface);
+  /* 글래스모피즘 (반투명 유리 질감) */
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  
   width: 100%;
   max-width: 400px;
-  border-radius: var(--radius-lg);
+  border-radius: 24px;
   padding: 40px 30px;
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 10px 40px 0 rgba(31, 38, 135, 0.15);
 }
 
 .logo-area {
   margin-bottom: 40px;
 }
 
-.logo-icon {
-  font-size: 3rem;
-  margin-bottom: 10px;
+/* 커스텀 로고 스타일 및 둥둥 떠다니는 애니메이션 */
+.custom-app-logo {
+  width: 85px;
+  height: 85px;
+  border-radius: 22px;
+  margin-bottom: 15px;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+  animation: float 6s ease-in-out infinite;
 }
 
-.logo-area h1 {
-  font-size: 1.5rem;
-  color: var(--color-text);
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+  100% { transform: translateY(0px); }
+}
+
+.logo-area h1.glow-text {
+  font-size: 1.6rem;
+  color: #222;
   margin-bottom: 5px;
+  font-weight: 800;
+  text-shadow: 0 2px 4px rgba(255,255,255,0.6);
 }
 
 .logo-area p {
@@ -235,17 +262,21 @@ const handleLogin = async () => {
 
 .input-group input {
   padding: 14px 16px;
-  border: 1px solid #E0E0E0;
-  border-radius: var(--radius-sm);
+  border: 1px solid rgba(0,0,0,0.1);
+  background: rgba(255,255,255,0.9);
+  border-radius: 12px;
   font-size: 1rem;
   font-family: inherit;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
   outline: none;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.02);
 }
 
 .input-group input:focus {
+  background: #ffffff;
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(107, 78, 255, 0.1);
+  box-shadow: 0 0 0 3px rgba(107, 78, 255, 0.15), 0 4px 10px rgba(0,0,0,0.05);
+  transform: translateY(-1px);
 }
 
 .pwd-input-wrapper {
@@ -279,23 +310,27 @@ const handleLogin = async () => {
 }
 
 .btn-primary {
-  margin-top: 10px;
+  margin-top: 15px;
   padding: 16px;
-  background-color: var(--color-primary);
+  background: linear-gradient(135deg, var(--color-primary) 0%, #8b6ff9 100%);
   color: white;
   border: none;
-  border-radius: var(--radius-sm);
-  font-size: 1rem;
+  border-radius: 12px;
+  font-size: 1.05rem;
+  font-weight: 700;
   cursor: pointer;
-  transition: background-color 0.2s ease, transform 0.1s ease;
+  box-shadow: 0 4px 15px rgba(107, 78, 255, 0.3);
+  transition: all 0.3s ease;
 }
 
 .btn-primary:active {
-  transform: scale(0.98);
+  transform: scale(0.97);
+  box-shadow: 0 2px 8px rgba(107, 78, 255, 0.3);
 }
 
 .btn-primary:hover {
-  background-color: var(--color-primary-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(107, 78, 255, 0.4);
 }
 
 .btn-secondary {
