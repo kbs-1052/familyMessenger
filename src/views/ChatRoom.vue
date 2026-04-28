@@ -263,7 +263,6 @@ const sendMessage = async (textOverride = null, imageUrl = null, type = 'text', 
   const newMessage = {
     room_id: roomId,
     sender: currentUser,
-    user: currentUser, // 호환성
     text: textToSend,
     time: formattedTime,
     image_url: imageUrl,
