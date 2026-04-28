@@ -192,12 +192,10 @@ const changeUsername = () => {
 }
 
 const handleLogout = () => {
-  if (confirm('로그아웃 하시겠습니까?')) {
-    localStorage.removeItem('family_code')
-    localStorage.removeItem('family_name')
-    localStorage.removeItem('chat_username')
-    router.push('/')
-  }
+  localStorage.removeItem('family_code')
+  localStorage.removeItem('family_name')
+  localStorage.removeItem('chat_username')
+  router.push('/')
 }
 </script>
 
