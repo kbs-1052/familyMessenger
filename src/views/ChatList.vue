@@ -11,6 +11,7 @@ let messagesChannel = null
 
 const familyCode = localStorage.getItem('family_code') || 'kimfamily'
 const familyName = localStorage.getItem('family_name') || '우리끼리 톡'
+const isLoading = ref(true)
 
 const fetchRooms = async () => {
   const { data: rooms, error } = await supabase
@@ -70,6 +71,7 @@ const fetchRooms = async () => {
     // 최근 메시지 순서대로 다시 정렬 (옵션)
     chatRooms.value = enrichedRooms
   }
+  isLoading.value = false
 }
 
 const goToChat = (id) => {
@@ -210,7 +212,17 @@ const handleLogout = () => {
     </header>
 
     <div class="chat-list-container">
+      <div v-if="isLoading" class="loading-state flex-col flex-center">
+        <div class="spinner"></div>
+        <p>채팅방 목록을 불러오는 중입니다...</p>
+      </div>
+      
+      <div v-else-if="chatRooms.length === 0" class="empty-state flex-col flex-center">
+        <p>개설된 채팅방이 없습니다.<br/>새로운 방을 만들어 보세요!</p>
+      </div>
+
       <div 
+        v-else
         v-for="room in chatRooms" 
         :key="room.id" 
         class="chat-room-item"
@@ -430,5 +442,30 @@ const handleLogout = () => {
 .nav-text {
   font-size: 0.75rem;
   font-weight: 500;
+}
+
+.loading-state, .empty-state {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  text-align: center;
+  padding: 20px;
+  line-height: 1.5;
+}
+
+.spinner {
+  width: 30px;
+  height: 30px;
+  border: 3px solid rgba(107, 78, 255, 0.2);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 15px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 </style>

@@ -8,22 +8,24 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey)
 async function testConnection() {
   console.log('Testing Supabase Connection...')
   
+  console.time('SupabaseRequest')
   const { data, error } = await supabase.from('messages').insert([{
     room_id: 1,
     sender: '테스트',
-    user: '테스트',
     text: '테스트 메시지',
     time: '오후 1:00',
     type: 'text',
     poll_data: null,
     read_by: ''
   }])
+  console.timeEnd('SupabaseRequest')
 
   if (error) {
     console.error(`INSERT ERROR:`, error)
   } else {
-    console.log(`INSERT OK!`, data)
+    console.log(`INSERT OK!`)
   }
+  process.exit(0)
 }
 
 testConnection()

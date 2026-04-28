@@ -10,6 +10,7 @@ const showPassword = ref(false)
 const name = ref('')
 const familyName = ref('') // 그룹 이름 (가입용)
 const isRegistering = ref(false) // 가입 모드 여부
+const isSubmitting = ref(false) // 로딩 상태
 
 const toggleMode = () => {
   isRegistering.value = !isRegistering.value
@@ -29,6 +30,8 @@ const handleRegister = async () => {
     return
   }
 
+  isSubmitting.value = true
+
   // 중복 코드 확인 및 가입 처리
   const { data: existing } = await supabase
     .from('family_auth')
@@ -38,6 +41,7 @@ const handleRegister = async () => {
 
   if (existing) {
     alert('이미 사용 중인 접속코드입니다. 다른 코드를 입력해주세요.')
+    isSubmitting.value = false
     return
   }
 
@@ -61,6 +65,7 @@ const handleRegister = async () => {
     alert('모임 계정이 생성되었습니다! 이제 로그인해 주세요.')
     isRegistering.value = false
   }
+  isSubmitting.value = false
 }
 
 const handleLogin = async () => {
@@ -68,6 +73,8 @@ const handleLogin = async () => {
     alert('모든 항목을 입력해주세요.')
     return
   }
+
+  isSubmitting.value = true
 
   // 데이터베이스에서 접속코드와 비밀번호 확인
   const { data, error } = await supabase
@@ -80,6 +87,7 @@ const handleLogin = async () => {
   if (error || !data) {
     alert('접속코드 또는 비밀번호가 일치하지 않습니다.')
     console.error('로그인 에러:', error)
+    isSubmitting.value = false
   } else {
     // 성공 시 모임 멤버 테이블에 내 이름 등록 (중복 시 무시)
     await supabase.from('family_members').upsert([
@@ -90,6 +98,8 @@ const handleLogin = async () => {
     localStorage.setItem('family_code', data.access_code)
     localStorage.setItem('family_name', data.family_name)
     localStorage.setItem('chat_username', name.value)
+    
+    // 로딩 상태를 유지한 채로 페이지 이동
     router.push('/chats')
   }
 }
@@ -140,8 +150,10 @@ const handleLogin = async () => {
           />
         </div>
 
-        <button type="submit" class="btn-primary font-bold">입장하기</button>
-        <button type="button" @click="toggleMode" class="btn-secondary">처음이신가요? 새 모임 등록하기</button>
+        <button type="submit" class="btn-primary font-bold" :disabled="isSubmitting">
+          {{ isSubmitting ? '입장 중...' : '입장하기' }}
+        </button>
+        <button type="button" @click="toggleMode" class="btn-secondary" :disabled="isSubmitting">처음이신가요? 새 모임 등록하기</button>
       </form>
 
       <form v-else @submit.prevent="handleRegister" class="login-form flex-col">
@@ -175,8 +187,10 @@ const handleLogin = async () => {
           />
         </div>
 
-        <button type="submit" class="btn-primary font-bold">모임 등록 완료</button>
-        <button type="button" @click="toggleMode" class="btn-secondary">이미 계정이 있나요? 로그인하기</button>
+        <button type="submit" class="btn-primary font-bold" :disabled="isSubmitting">
+          {{ isSubmitting ? '처리 중...' : '모임 등록 완료' }}
+        </button>
+        <button type="button" @click="toggleMode" class="btn-secondary" :disabled="isSubmitting">이미 계정이 있나요? 로그인하기</button>
       </form>
     </div>
   </div>
